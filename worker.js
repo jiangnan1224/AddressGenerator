@@ -13,7 +13,10 @@ const countryCoordinates = {
     "JP": [{ lat: 35.6895, lng: 139.6917 }, { lat: 34.6937, lng: 135.5023 }],
     "IN": [{ lat: 28.6139, lng: 77.2090 }, { lat: 19.0760, lng: 72.8777 }],
     "AU": [{ lat: -33.8688, lng: 151.2093 }, { lat: -37.8136, lng: 144.9631 }],
-    "BR": [{ lat: -23.5505, lng: -46.6333 }, { lat: -22.9068, lng: -43.1729 }],
+    "BR": [
+        { lat: -23.5505, lng: -46.6333, city: 'São Paulo', areaCodes: ['11'] },
+        { lat: -22.9068, lng: -43.1729, city: 'Rio de Janeiro', areaCodes: ['21'] }
+    ],
     "CA": [{ lat: 43.651070, lng: -79.347015 }, { lat: 45.501690, lng: -73.567253 }],
     "RU": [{ lat: 55.7558, lng: 37.6173 }, { lat: 59.9343, lng: 30.3351 }],
     "ZA": [{ lat: -33.9249, lng: 18.4241 }, { lat: -26.2041, lng: 28.0473 }],
@@ -250,6 +253,29 @@ const phoneFormats = {
     "ZA": {
         format: "+27 8X XXX XXXX",
         mobilePrefix: ["6", "7", "8"]
+    },
+    // 巴西手机号：地区码（DDD）+ 9 开头的 9 位号码；地区码按种子城市匹配
+    "BR": {
+        format: "+55 XX 9XXXX-XXXX",
+        mobilePrefix: ["11", "21"]
+    },
+    // 印度手机号：10 位，首位 6-9
+    "IN": {
+        format: "+91 XXXXX XXXXX",
+        mobilePrefix: ["6", "7", "8", "9"]
+    },
+    // 俄罗斯手机号以 9 开头
+    "RU": {
+        format: "+7 9XX XXX-XX-XX"
+    },
+    // 意大利手机号以 3 开头
+    "IT": {
+        format: "+39 3XX XXX XXXX"
+    },
+    // 西班牙手机号以 6 或 7 开头
+    "ES": {
+        format: "+34 XXX XX XX XX",
+        mobilePrefix: ["6", "7"]
     }
 };
 
@@ -286,12 +312,13 @@ function pickUsAreaCodes(seed, stateCode) {
     return US_AREA_CODES[stateCode] || null;
 }
 
-// areaCodes：可选的区号列表（北美号码），不传则按号码格式随机
+// areaCodes：可选的区号/前缀列表（如美国城市区号、巴西地区码），不传则按号码格式随机
 function getRandomPhoneNumber(country, areaCodes) {
     const format = phoneFormats[country] || phoneFormats["US"];
     let phone = format.format;
 
-    if (areaCodes || format.areaCodeRanges) {
+    if (format.areaCodeRanges) {
+        // 北美号码（美国、加拿大）
         const areaCode = areaCodes
             ? areaCodes[Math.floor(Math.random() * areaCodes.length)]
             : generateAreaCode(format.areaCodeRanges);
@@ -299,8 +326,9 @@ function getRandomPhoneNumber(country, areaCodes) {
         // 北美号码的交换局号（中间三位）首位只能是 2-9
         phone = phone.replace("X", () => 2 + Math.floor(Math.random() * 8));
         phone = phone.replace(/X/g, () => Math.floor(Math.random() * 10));
-    } else if (format.mobilePrefix) {
-        const prefix = format.mobilePrefix[Math.floor(Math.random() * format.mobilePrefix.length)];
+    } else if (areaCodes || format.mobilePrefix) {
+        const prefixes = areaCodes || format.mobilePrefix;
+        const prefix = String(prefixes[Math.floor(Math.random() * prefixes.length)]);
         // 先替换前缀
         if (prefix.length === 2) {
             phone = phone.replace(/XX/, prefix);
@@ -2001,7 +2029,9 @@ async function handleApiRequest(request) {
         return jsonResponse({
             name: getRandomName(country),
             gender: Math.random() > 0.5 ? 'Male' : 'Female',
-            phone: getRandomPhoneNumber(country, country === 'US' ? pickUsAreaCodes(found.seed, parts.stateCode) : null),
+            phone: getRandomPhoneNumber(country, country === 'US'
+                ? pickUsAreaCodes(found.seed, parts.stateCode)
+                : (found.seed && found.seed.areaCodes) || null),
             address: formatAddress(country, parts),
             addressParts: { ...parts, country: COUNTRY_NAMES[country] || country },
             type: found.kind,
