@@ -557,7 +557,7 @@ const htmlContent = `<!DOCTYPE html>
             toggleLoading(true);
             
             try {
-                const response = await fetch(\`\${window.location.href}api?country=\${country}\`);
+                const response = await fetch(\`\${window.location.href}api?country=\${encodeURIComponent(country)}\`);
                 const data = await response.json();
                 
                 if (data.error) {
