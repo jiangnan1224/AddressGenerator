@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机地址生成器（本地验证）</title>
+</head>
+<body>
+    <p id="boot">正在加载 worker.js …</p>
+
+    <!--
+        本地验证页：直接加载要部署的 worker.js，在浏览器里模拟 Cloudflare Worker。
+        页面里对 /api 的请求会交给 worker.js 的 handleRequest 处理，其余请求照常发出。
+        这样本地验证的就是将要部署的同一份代码，无需维护两份。
+    -->
+    <script src="worker.js"></script>
+    <script>
+        (function () {
+            if (typeof handleRequest !== 'function' || typeof htmlContent !== 'string') {
+                document.getElementById('boot').textContent =
+                    '未能加载 worker.js：请确认 local.html 与 worker.js 在同一目录，并通过本地服务器打开（如 python3 -m http.server 8000）。';
+                return;
+            }
+
+            const nativeFetch = window.fetch.bind(window);
+            window.fetch = function (input, init) {
+                const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+                if (url.pathname === '/api') {
+                    return handleRequest(new Request('http://localhost/api' + url.search, init));
+                }
+                return nativeFetch(input, init);
+            };
+
+            // 等本页解析完成后，用 Worker 返回的 HTML 替换整个文档
+            window.addEventListener('load', function () {
+                document.open();
+                document.write(htmlContent);
+                document.close();
+            });
+        })();
+    </script>
+</body>
+</html>
